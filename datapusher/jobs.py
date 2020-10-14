@@ -30,8 +30,9 @@ else:
     locale.setlocale(locale.LC_ALL, '')
 
 MAX_CONTENT_LENGTH = web.app.config.get('MAX_CONTENT_LENGTH') or 10485760
-CHUNK_SIZE = 16 * 1024  # 16kb
-DOWNLOAD_TIMEOUT = 30
+CHUNK_SIZE = web.app.config.get('CHUNK_SIZE') or 16384
+CHUNK_INSERT_ROWS = web.app.config.get('CHUNK_INSERT_ROWS') or 250
+DOWNLOAD_TIMEOUT = web.app.config.get('DOWNLOAD_TIMEOUT') or 30
 
 if web.app.config.get('SSL_VERIFY') in ['False', 'FALSE', '0', False, 0]:
     SSL_VERIFY = False
@@ -215,8 +216,8 @@ def datastore_resource_exists(resource_id, api_key, ckan_url):
         search_url = get_url('datastore_search', ckan_url)
         response = requests.post(search_url,
                                  verify=SSL_VERIFY,
-                                 params={'id': resource_id,
-                                         'limit': 0},
+                                 data=json.dumps({'id': resource_id,
+                                         'limit': 0}),
                                  headers={'Content-Type': 'application/json',
                                           'Authorization': api_key}
                                  )
@@ -463,7 +464,13 @@ def push_to_datastore(task_id, input, dry_run=False):
                 column_name = cell.column.strip()
                 if column_name not in headers_set:
                     continue
-                data_row[column_name] = cell.value
+                if isinstance(cell.value, str):
+                    try:
+                        data_row[column_name] = cell.value.encode('latin-1').decode('utf-8')
+                    except (UnicodeDecodeError, UnicodeEncodeError):
+                        data_row[column_name] = cell.value
+                else:
+                    data_row[column_name] = cell.value
             yield data_row
     result = row_iterator()
 
@@ -497,7 +504,7 @@ def push_to_datastore(task_id, input, dry_run=False):
         return headers_dicts, result
 
     count = 0
-    for i, chunk in enumerate(chunky(result, 250)):
+    for i, chunk in enumerate(chunky(result, CHUNK_INSERT_ROWS)):
         records, is_it_the_last_chunk = chunk
         count += len(records)
         logger.info('Saving chunk {number} {is_last}'.format(
