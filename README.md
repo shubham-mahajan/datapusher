@@ -1,5 +1,4 @@
-[![Build Status](https://travis-ci.org/ckan/datapusher.png?branch=master)](https://travis-ci.org/ckan/datapusher)
-[![Coverage Status](https://coveralls.io/repos/ckan/datapusher/badge.png?branch=master)](https://coveralls.io/r/ckan/datapusher?branch=master)
+[![Tests](https://github.com/ckan/datapusher/actions/workflows/test.yml/badge.svg)](https://github.com/ckan/datapusher/actions/workflows/test.yml)
 [![Latest Version](https://img.shields.io/pypi/v/datapusher.svg)](https://pypi.python.org/pypi/datapusher/)
 [![Downloads](https://img.shields.io/pypi/dm/datapusher.svg)](https://pypi.python.org/pypi/datapusher/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/datapusher.svg)](https://pypi.python.org/pypi/datapusher/)
@@ -67,7 +66,7 @@ If you need to change the host or port, copy `deployment/datapusher_settings.py`
 
 To run the tests:
 
-    nosetests
+    pytest
 
 ## Production deployment
 
@@ -85,24 +84,24 @@ probably need to set up Nginx as a reverse proxy in front of it and something li
 Supervisor to keep the process up.
 
 
-	 # Install requirements for the DataPusher
-	 sudo apt install python3-venv python3-dev build-essential
-	 sudo apt-get install python-dev python-virtualenv build-essential libxslt1-dev libxml2-dev git libffi-dev
+     # Install requirements for the DataPusher
+     sudo apt install python3-venv python3-dev build-essential
+     sudo apt-get install python-dev python-virtualenv build-essential libxslt1-dev libxml2-dev git libffi-dev
 
-	 # Create a virtualenv for datapusher
+     # Create a virtualenv for datapusher
      sudo python3 -m venv /usr/lib/ckan/datapusher
 
-	 # Create a source directory and switch to it
-	 sudo mkdir /usr/lib/ckan/datapusher/src
-	 cd /usr/lib/ckan/datapusher/src
+     # Create a source directory and switch to it
+     sudo mkdir /usr/lib/ckan/datapusher/src
+     cd /usr/lib/ckan/datapusher/src
 
-	 # Clone the source (you should target the latest tagged version)
-	 sudo git clone -b 0.0.17 https://github.com/ckan/datapusher.git
+     # Clone the source (you should target the latest tagged version)
+     sudo git clone -b 0.0.17 https://github.com/ckan/datapusher.git
 
-	 # Install the DataPusher and its requirements
-	 cd datapusher
-	 sudo /usr/lib/ckan/datapusher/bin/pip install -r requirements.txt
-	 sudo /usr/lib/ckan/datapusher/bin/python setup.py develop
+     # Install the DataPusher and its requirements
+     cd datapusher
+     sudo /usr/lib/ckan/datapusher/bin/pip install -r requirements.txt
+     sudo /usr/lib/ckan/datapusher/bin/python setup.py develop
 
      # Create a user to run the web service (if necessary)
      sudo addgroup www-data
@@ -132,8 +131,8 @@ The default DataPusher configuration uses SQLite as the backend for the jobs dat
     sudo -u postgres createuser -S -D -R -P datapusher_jobs
     sudo -u postgres createdb -O datapusher_jobs datapusher_jobs -E utf-8
 
-	# Run this in the virtualenv where DataPusher is installed
-	pip install psycopg2
+    # Run this in the virtualenv where DataPusher is installed
+    pip install psycopg2
 
     # Edit SQLALCHEMY_DATABASE_URI in datapusher_settings.py accordingly
     # eg SQLALCHEMY_DATABASE_URI=postgresql://datapusher_jobs:YOURPASSWORD@localhost/datapusher_jobs
@@ -143,9 +142,9 @@ The default DataPusher configuration uses SQLite as the backend for the jobs dat
 
     ```
     # ... rest of datapusher-uwsgi.ini
-	workers         =  3
-	threads         =  3
-	lazy-apps       =  true
+    workers         =  3
+    threads         =  3
+    lazy-apps       =  true
     ```
 
 ## Configuring
@@ -162,6 +161,10 @@ In order to tell CKAN where this webservice is located, the following must be
 added to the `[app:main]` section of your CKAN configuration file :
 
     ckan.datapusher.url = http://127.0.0.1:8800/
+   
+Starting from CKAN 2.10, DataPusher requires a valid API token to operate (see [the documentation on API tokens](https://docs.ckan.org/en/latest/api/index.html#authentication-and-api-tokens)), and will fail to start if the following option is not set:
+
+    ckan.datapusher.api_token = <api_token>
 
 There are other CKAN configuration options that allow to customize the CKAN - DataPusher
 integation. Please refer to the [DataPusher Settings](https://docs.ckan.org/en/latest/maintaining/configuration.html#datapusher-settings) section in the CKAN documentation for more details.
@@ -184,12 +187,14 @@ Here's a summary of the options available.
 | SSL_VERIFY | False | Do not validate SSL certificates when requesting the data file (*Warning*: Do not use this setting in production) |
 | TYPES | [messytables.StringType, messytables.DecimalType, messytables.IntegerType, messytables.DateUtilType] | [Messytables][] types used internally, can be modified to customize the type guessing |
 | TYPE_MAPPING | {'String': 'text', 'Integer': 'numeric', 'Decimal': 'numeric', 'DateUtil': 'timestamp'} | Internal Messytables type mapping |
+| LOG_FILE | `/tmp/ckan_service.log` | Where to write the logs. Use an empty string to disable |
+| STDERR | `True` | Log to stderr? |
 
 
-Most of the configuration options above can be also provided as environment variables prepending the name with `DATAPUSHER_`, eg `DATAPUSHER_SQLALCHEMY_DATABASE_URI`, `DATAPUSHER_PORT`, etc.
+Most of the configuration options above can be also provided as environment variables prepending the name with `DATAPUSHER_`, eg `DATAPUSHER_SQLALCHEMY_DATABASE_URI`, `DATAPUSHER_PORT`, etc. In the specific case of `DATAPUSHER_STDERR` the possible values are `1` and `0`.
 
 
-By default DataPusher uses SQLite as the database backend for the jobs information. This is fine for local development and sites with low activity, but for sites that need more performance should use Postgres as the backend for the jobs database (eg `SQLALCHEMY_DATABASE_URI=postgresql://datapusher_jobs:YOURPASSWORD@localhost/datapusher_jobs`. See also [High Availability Setup](#high-availability-setup). If SQLite is used, is probably a good idea to store the database in a location other than `/tmp`. This will prevent the database being dropped, causing out of sync errors in the CKAN side. A good place to store it is the CKAN storage folder (if DataPusher is installed in the same server), generally in `/var/lib/ckan/`.
+By default, DataPusher uses SQLite as the database backend for jobs information. This is fine for local development and sites with low activity, but for sites that need more performance, Postgres should be used as the backend for the jobs database (eg `SQLALCHEMY_DATABASE_URI=postgresql://datapusher_jobs:YOURPASSWORD@localhost/datapusher_jobs`. See also [High Availability Setup](#high-availability-setup). If SQLite is used, its probably a good idea to store the database in a location other than `/tmp`. This will prevent the database being dropped, causing out of sync errors in the CKAN side. A good place to store it is the CKAN storage folder (if DataPusher is installed in the same server), generally in `/var/lib/ckan/`.
 
 
 ## Usage

@@ -12,12 +12,14 @@ that the right values were pushed?
 """
 import os
 import json
-import unittest
 import datetime
 
-from nose.tools import assert_equal, raises
 import httpretty
-import requests
+import pytest
+try:
+    import unittest.mock as mock
+except ImportError:
+    import mock
 
 import datapusher.main as main
 import datapusher.jobs as jobs
@@ -37,7 +39,7 @@ def get_static_file(filename):
     return open(join_static_path(filename), 'rb').read()
 
 
-class TestImport(unittest.TestCase):
+class TestImport():
     @classmethod
     def setup_class(cls):
         cls.host = 'www.ckan.org'
@@ -93,18 +95,15 @@ class TestImport(unittest.TestCase):
                                body=json.dumps({'success': True}),
                                content_type='application/json')
 
-
         # A URL that mocks checking if a datastore table exists
         datastore_check_url = 'http://www.ckan.org/api/3/action/datastore_search'
         httpretty.register_uri(httpretty.POST, datastore_check_url,
                                body=json.dumps({'success': True}),
                                content_type='application/json')
 
-
         return source_url, res_url
 
     @httpretty.activate
-    @raises(util.JobError)
     def test_too_large_content_length(self):
         """It should raise JobError if the returned Content-Length header
         is too large.
@@ -136,10 +135,10 @@ class TestImport(unittest.TestCase):
             content_length=size,
             content_type='application/json')
 
-        jobs.push_to_datastore('fake_id', data, True)
+        with pytest.raises(util.JobError):
+            jobs.push_to_datastore('fake_id', data, True)
 
     @httpretty.activate
-    @raises(util.JobError)
     def test_too_large_file(self):
         """It should raise JobError if the data file is too large.
 
@@ -172,7 +171,8 @@ class TestImport(unittest.TestCase):
                 'content-length': None
             })
 
-        jobs.push_to_datastore('fake_id', data, True)
+        with pytest.raises(util.JobError):
+            jobs.push_to_datastore('fake_id', data, True)
 
     @httpretty.activate
     def test_content_length_string(self):
@@ -246,12 +246,12 @@ class TestImport(unittest.TestCase):
 
         headers, results = jobs.push_to_datastore('fake_id', data, True)
         results = list(results)
-        assert_equal(headers, [{'type': 'timestamp', 'id': 'date'},
+        assert (headers == [{'type': 'timestamp', 'id': 'date'},
                                {'type': 'numeric', 'id': 'temperature'},
                                {'type': 'text', 'id': 'place'}])
-        assert_equal(len(results), 6)
-        assert_equal(
-            results[0],
+        assert len(results) == 6
+        assert (
+            results[0] ==
             {'date': datetime.datetime(2011, 1, 1, 0, 0), 'place': 'Galway',
              'temperature': 1})
 
@@ -277,11 +277,11 @@ class TestImport(unittest.TestCase):
 
         headers, results = jobs.push_to_datastore('fake_id', data, True)
         results = list(results)
-        assert_equal(headers, [{'type': 'timestamp', 'id': 'date'},
+        assert (headers == [{'type': 'timestamp', 'id': 'date'},
                                {'type': 'numeric', 'id': 'temperature'},
                                {'type': 'text', 'id': 'place'}])
-        assert_equal(len(results), 6)
-        assert_equal(results[0],
+        assert len(results) == 6
+        assert (results[0] ==
                      {'date': datetime.datetime(2011, 1, 1, 0, 0),
                       'place': 'Galway', 'temperature': 1})
 
@@ -307,11 +307,11 @@ class TestImport(unittest.TestCase):
 
         headers, results = jobs.push_to_datastore('fake_id', data, True)
         results = list(results)
-        assert_equal(headers, [{'type': 'timestamp', 'id': 'date'},
-                               {'type': 'numeric', 'id': 'temperature'},
+        assert (headers == [{'type': 'timestamp', 'id': 'date'},
+                            {'type': 'numeric', 'id': 'temperature'},
                                {'type': 'text', 'id': 'place'}])
-        assert_equal(len(results), 6)
-        assert_equal(results[0],
+        assert len(results) == 6
+        assert (results[0] ==
                      {'date': datetime.datetime(2011, 1, 1, 0, 0),
                       'place': 'Galway', 'temperature': 1})
 
@@ -336,11 +336,11 @@ class TestImport(unittest.TestCase):
 
         headers, results = jobs.push_to_datastore('fake_id', data, True)
         results = list(results)
-        assert_equal(headers, [{'type': 'timestamp', 'id': 'date'},
+        assert (headers == [{'type': 'timestamp', 'id': 'date'},
                                {'type': 'numeric', 'id': 'temperature'},
                                {'type': 'text', 'id': 'place'}])
-        assert_equal(len(results), 6)
-        assert_equal(results[0],
+        assert len(results) == 6
+        assert (results[0] ==
                      {'date': datetime.datetime(2011, 1, 1, 0, 0),
                       'place': 'Galway', 'temperature': 1})
 
@@ -365,7 +365,7 @@ class TestImport(unittest.TestCase):
 
         headers, results = jobs.push_to_datastore('fake_id', data, True)
         results = list(results)
-        assert_equal(headers, [{'type': 'text', 'id': 'Directorate'},
+        assert (headers == [{'type': 'text', 'id': 'Directorate'},
                                {'type': 'text', 'id': 'Service Area'},
                                {'type': 'text', 'id': 'Expenditure Category'},
                                {'type': 'timestamp', 'id': 'Payment Date'},
@@ -376,8 +376,8 @@ class TestImport(unittest.TestCase):
                                {'type': 'text',
                                 'id': 'Cost Centre Description'},
                                {'type': 'numeric', 'id': 'Grand Total'}])
-        assert_equal(len(results), 230)
-        assert_equal(results[0],
+        assert len(results) == 230
+        assert (results[0] ==
                      {'Directorate': 'Adult and Culture',
                       'Service Area': 'Ad Serv-Welfare Rights-    ',
                       'Expenditure Category': 'Supplies & Services',
@@ -411,12 +411,11 @@ class TestImport(unittest.TestCase):
 
         headers, results = jobs.push_to_datastore('fake_id', data, True)
         results = list(results)
-        assert_equal(len(headers), 9)
-        assert_equal(len(results), 82)
-        assert_equal(headers[0]['id'].strip(), '1985')
-        assert_equal(results[1]['1993'].strip(), '379')
+        assert len(headers) == 9
+        assert len(results) == 82
+        assert headers[0]['id'].strip() == '1985'
+        assert results[1]['1993'].strip() == '379'
 
-    @raises(util.JobError)
     @httpretty.activate
     def test_bad_url(self):
         """It should raise HTTPError(JobError) if the resource.url is badly
@@ -436,9 +435,9 @@ class TestImport(unittest.TestCase):
             }
         }
 
-        jobs.push_to_datastore('fake_id', data, True)
+        with pytest.raises(util.JobError):
+            jobs.push_to_datastore('fake_id', data, True)
 
-    @raises(util.JobError)
     @httpretty.activate
     def test_bad_scheme(self):
         """It should raise HTTPError(JobError) if the resource.url is an
@@ -458,7 +457,8 @@ class TestImport(unittest.TestCase):
             }
         }
 
-        jobs.push_to_datastore('fake_id', data, True)
+        with pytest.raises(util.JobError):
+            jobs.push_to_datastore('fake_id', data, True)
 
     @httpretty.activate
     def test_mostly_numbers(self):
@@ -481,8 +481,8 @@ class TestImport(unittest.TestCase):
 
         headers, results = jobs.push_to_datastore('fake_id', data, True)
         results = list(results)
-        assert_equal(len(headers), 19)
-        assert_equal(len(results), 133)
+        assert len(headers) == 19
+        assert len(results) == 133
 
     @httpretty.activate
     def test_long_file(self):
@@ -505,8 +505,8 @@ class TestImport(unittest.TestCase):
 
         headers, results = jobs.push_to_datastore('fake_id', data, True)
         results = list(results)
-        assert_equal(len(headers), 1)
-        assert_equal(len(results), 4000)
+        assert len(headers) == 1
+        assert len(results) == 4000
 
     @httpretty.activate
     def test_do_not_push_when_same_hash(self):
@@ -550,3 +550,90 @@ class TestImport(unittest.TestCase):
         # res should be None because we didn't get to the part that
         # returns something
         assert not res, res
+
+    @httpretty.activate
+    def test_download_resource_with_callbach_url_base_on_uploads(self):
+        """
+        Rather than re-registering all URLs, we'll consider the www.ckan.org host
+        the internal host set via ckan.datapusher.callback_url_base, and ckan.example.org
+        the public host used in the resource URLs
+        """
+
+        source_url, res_url = self.register_urls(
+            source_url='http://ckan.example.org/dataset/some_dataset/resource/{}/download'.format(self.resource_id)
+        )
+        httpretty.register_uri(
+            httpretty.POST, res_url,
+            body=json.dumps({
+                'success': True,
+                'result': {
+                    'id': '32h4345k34h5l345',
+                    'name': 'short name',
+                    'url': source_url,
+                    'format': 'csv',
+                    'url_type': 'upload',
+                }
+            }),
+            content_type='application/json')
+
+        data = {
+            'api_key': self.api_key,
+            'job_type': 'push_to_datastore',
+            'metadata': {
+                'ckan_url': 'http://%s/' % self.host,
+                'resource_id': self.resource_id
+            }
+        }
+	
+        with mock.patch('datapusher.jobs.get_data_response') as m:
+
+            m.side_effect = RuntimeError()
+            try:
+                res = jobs.push_to_datastore('fake_id', data, True)
+            except RuntimeError:
+
+                assert m.called
+                download_url = m.call_args[0][0]
+                assert download_url[:download_url.index('/dataset')] == 'http://www.ckan.org'
+
+    @httpretty.activate
+    def test_download_resource_with_callbach_url_base_on_external(self):
+        """
+        Rather than re-registering all URLs, we'll consider the www.ckan.org host
+        the internal host set via ckan.datapusher.callback_url_base, and ckan.example.org
+        the public host used in the resource URLs
+        """
+
+        source_url, res_url = self.register_urls()
+        httpretty.register_uri(
+            httpretty.POST, res_url,
+            body=json.dumps({
+                'success': True,
+                'result': {
+                    'id': '32h4345k34h5l345',
+                    'name': 'short name',
+                    'url': source_url,
+                    'format': 'csv',
+                }
+            }),
+            content_type='application/json')
+
+        data = {
+            'api_key': self.api_key,
+            'job_type': 'push_to_datastore',
+            'metadata': {
+                'ckan_url': 'http://%s/' % self.host,
+                'resource_id': self.resource_id
+            }
+        }
+	
+        with mock.patch('datapusher.jobs.get_data_response') as m:
+
+            m.side_effect = RuntimeError()
+            try:
+                res = jobs.push_to_datastore('fake_id', data, True)
+            except RuntimeError:
+
+                assert m.called
+                download_url = m.call_args[0][0]
+                assert download_url.startswith('http://www.source.org')
